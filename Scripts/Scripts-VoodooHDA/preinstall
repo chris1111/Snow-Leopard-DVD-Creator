@@ -1,0 +1,52 @@
+#!/bin/sh
+# VoodooHDA 2.9.0d10
+
+echo "postinstall: Path to $1"
+
+
+echo "
+############### Start script ################"
+echo " "
+
+echo "### Backup for AppleHDA.kext ###"
+echo " "
+
+date=`date -j +%F-%Hh%M`
+
+for i in AppleHDA VoodooHDA; do
+
+        if [ -e "${3}"/System/Library/Extensions/$i.kext ]; then
+                if [ -n "${3}"/$HOME/Desktop/Backup\ Extensions/$date ]; then
+                        echo "creating Backup Directory..."
+                        echo " "
+                        mkdir -p "${3}"/$HOME/Desktop/Backup\ Extensions/$date
+                fi
+                cp -R "${3}"/System/Library/Extensions/$i.kext "${3}"/$HOME/Desktop/Backup\ Extensions/$date	
+		rm -R "${3}"/System/Library/Extensions/$i.kext
+
+        fi
+        if [ -e "${3}"/Extra/Extensions/$i.kext ]; then
+                if [ -n "${3}"/$HOME/Desktop/Backup\ Extensions/$date ]; then
+                        echo "creating Backup Directory..."
+                        mkdir -p "${3}"/$HOME/Desktop/Backup\ Extensions/$date
+                fi
+                cp -R "${3}"/Extra/Extensions/$i.kext "${3}"/$HOME/Desktop/Backup\ Extensions/$date
+                rm -R "${3}"/Extra/Extensions/$i.kext
+
+        fi
+
+done
+
+echo "### Install for VoodooHDA.kext ###"
+if [ -d "$3/System/Library/Extensions/AppleHDADisabler.kext" ];then
+    rm -rf "$3/System/Library/Extensions/AppleHDADisabler.kext"
+fi
+
+if [ -d "$3/System/Library/Extensions/VoodooHDA.kext" ];then
+    rm -rf "$3/System/Library/Extensions/VoodooHDA.kext"
+fi
+
+
+echo " "
+
+exit 0

@@ -1,0 +1,249 @@
+#!/bin/bash
+# Installer Mac OS X Snow Leopard
+# (c) Copyright 2026 chris1111 
+# This will create an iso of Mac OS X Snow Leopard
+PARENTDIR=$(dirname "$0")
+cd "$PARENTDIR"
+# Vars
+apptitle="Installer Mac OS X Snow Leopard"
+version="1.0"
+# Set Icon directory and file 
+iconfile="/System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns"
+find . -name '.DS_Store' -type f -delete
+
+# Select choice
+response=$(osascript -e 'tell app "System Events" to display dialog "This program will create a bootable ISO image of Mac OS X Snow Leopard.
+
+Please read this NOTE:
+---------------------
+You can create an iso of Mac OS X Snow Leopard 10.6.7 only!
+
+If you have already create 
+Mac OS X Install DVD.iso on the desktop, 
+it will automatically deleted by the script. 
+
+So If you would like to create more disk images; put the images 
+in a folder apart before continue.\n\nSelect OK to Continue 
+Cancel to Quit" buttons {"Cancel","OK"} default button 2 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'"  ')
+
+action=$(echo $response | cut -d ':' -f2)
+
+# Exit if Canceled
+if [ ! "$action" ] ; then
+  osascript -e 'display notification "Program closing" with title "'"$apptitle"'" subtitle "User cancelled"'
+  exit 0
+fi
+
+if [[ $(mount | awk '$3 == "/Volumes/Mac-OSX-Install-DVD" {print $3}') != "" ]]; then
+ hdiutil detach -Force "/Volumes/Mac-OSX-Install-DVD"
+fi
+
+if [[ -d "/Volumes/Mac OS X Install DVD" ]]; then
+ hdiutil detach -Force "/Volumes/Mac OS X Install DVD"
+fi
+
+if [ "/Private/tmp/Mac-OSX.sparseimage" ]; then
+	rm -rf "/Private/tmp/MacOS.sparseimage"
+fi
+
+echo "**********************************************  "
+echo "Starting Mac OS X Install DVD! " 
+
+# Get image file location
+  imagepath=`/usr/bin/osascript << EOT
+    tell application "Finder"
+        activate
+        set imagefilepath to choose file default location "$HOME/Desktop" with prompt "Choose your Mac OS X Install DVD.dmg"
+    end tell 
+    return (posix path of imagefilepath) 
+  EOT`
+
+  # Cancel is user selects Cancel
+  if [ ! "$imagepath" ] ; then
+    osascript -e 'display notification "Program closing" with title "'"$apptitle"'" subtitle "User cancelled"'
+    exit 0
+  fi
+
+osascript <<EOD
+  tell application "Terminal"
+      activate
+  end tell
+EOD
+
+# Check if the variable ends with .dmg
+if [[ "$imagepath" == *.dmg ]]; then
+    echo "The file is a DMG image OK ✅"
+else 
+
+if [[ "$imagepath" == *.iso ]]; then
+    echo "The file is not a DMG image 🚫
+You need to use a DMG of Mac OS X Install DVD!
+Convert your image then retry."
+    osascript -e 'tell app "System Events" to display dialog "You need to use a DMG of Mac OS X Install DVD
+Convert your image then retry.\n\n" buttons {"EXIT"} default button 1 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'" giving up after 10'
+    exit 0
+fi
+
+fi
+
+osascript <<EOD
+  tell application "Terminal"
+      activate
+  end tell
+EOD
+
+
+# Get the size in Megabytes (6GB = 6000MB)
+SIZE_MB=$(du -sm "$imagepath" | awk '{print $1}')
+
+if [ "$SIZE_MB" -lt 6000 ]; then
+    echo "This image is lower than 6g."
+    osascript -e 'tell app "System Events" to display dialog "You need the 10.6.7 Image! This is not good.\n\n" buttons {"EXIT"} default button 1 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'" giving up after 5'
+    rm -rf "/Private/tmp/MacOS.sparseimage"
+    osascript -e 'display notification "Program closing" with title "'"$apptitle"'" subtitle "User cancelled"'
+    exit 0
+else
+    echo "Success: This image is 6g and higher ($SIZE_MB MB)."
+    osascript -e 'tell app "System Events" to display dialog "Reminder: You need a 8.5g DVD Double Layer for this Image.\n\n" buttons {"OK"} default button 1 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'" giving up after 5'
+fi
+
+# Convert the image
+hdiutil convert "$imagepath" -format UDSP -o /Private/tmp/MacOS
+# Increase the sparse bundle capacity
+hdiutil resize -size 8.1g /Private/tmp/MacOS.sparseimage
+
+Sleep 2
+
+if [ "/$HOME/Desktop/Mac OS X Install DVD.iso" ]; then
+	rm -rf "/$HOME/Desktop/Mac OS X Install DVD.iso"
+fi
+
+
+# Mount the sparse bundle for package addition
+hdiutil attach /Private/tmp/MacOS.sparseimage -noverify -nobrowse -mountpoint /Volumes/Mac-OSX-Install-DVD
+
+osascript <<EOD
+  tell application "Terminal"
+      activate
+  end tell
+EOD
+
+echo "Copying Packages"
+mkdir -p /Volumes/Mac-OSX-Install-DVD/"Snow DVD Creator"
+Sleep 1
+cp -Rp ./* /Volumes/Mac-OSX-Install-DVD/"Snow DVD Creator"
+
+echo " "
+echo "**********************************************  "
+echo "Install Chameleon! "   
+echo "**********************************************  "
+echo "Select 1 for PC or 2 for Laptop "
+
+options=("PC" "Laptop")
+
+function option1 {
+    echo "You selected PC."
+    cp -Rp ./DVD-PC/* /Volumes/Mac-OSX-Install-DVD
+}
+
+function option2 {
+    echo "You selected Laptop."
+    cp -Rp ./DVD-Lptop/* /Volumes/Mac-OSX-Install-DVD
+}
+
+PS3="Please enter your choice: Following by Enter "
+select option in "${options[@]}"; do
+    case $option in
+        "PC")
+            option1
+            break
+            ;;
+        "Laptop")
+            option2
+            break
+            ;;
+        *)
+            echo "Invalid option. Try again."
+            ;;
+    esac
+done
+
+Sleep 2
+# hidden folder and file
+chflags hidden /Volumes/Mac-OSX-Install-DVD/usr
+
+# Unmount the dmg image
+hdiutil detach -Force /Volumes/Mac-OSX-Install-DVD
+
+# Resize the partition in the sparse bundle to remove any free space
+hdiutil resize -size `hdiutil resize -limits /Private/tmp/MacOS.sparseimage | tail -n 1 | awk '{ print $1 }'`b /Private/tmp/MacOS.sparseimage
+
+Sleep 2
+# Mount the dmg image
+hdiutil attach /Private/tmp/MacOS.sparseimage -noverify -nobrowse -mountpoint /Volumes/Mac-OSX-Install-DVD
+
+osascript <<EOD
+  tell application "Terminal"
+      activate
+  end tell
+EOD
+
+echo " "
+echo "**********************************************  "
+echo "Create iso image 
+Type Your Password!"   
+echo "**********************************************  "
+echo " "
+# Create ISO image
+sudo hdiutil makehybrid -o "$HOME/Desktop/Mac OS X Install DVD.iso" "/Volumes/Mac-OSX-Install-DVD" -iso -hfs -joliet -eltorito-boot "/Volumes/Mac-OSX-Install-DVD/usr/standalone/i386/cdboot" -no-emul-boot -hfs-volume-name "Mac OS X Install DVD" -joliet-volume-name "Mac OS X Install DVD"
+
+echo "**********************************************  "
+echo "Unmount Installer image!  "
+echo "**********************************************  "
+Sleep 1
+hdiutil detach -Force /Volumes/"Mac-OSX-Install-DVD"
+Sleep 1
+# Remove dmg and Clover
+rm -rf /Private/tmp/MacOS.sparseimage
+
+echo " "
+echo "**********************************************  "
+echo "Burning DVD! "   
+echo "**********************************************  "
+
+options=("Burn the DVD" "Exit")
+
+function option1 {
+    echo "You selected Burn the DVD."
+    hdiutil burn -noverifyburn $HOME/Desktop/"Mac OS X Install DVD.iso"
+    Sleep 1
+    Open -R ~/Desktop/"Mac OS X Install DVD.iso"
+}
+
+function option2 {
+    echo "You selected to Quit."
+    Sleep 1
+    Open -R ~/Desktop/"Mac OS X Install DVD.iso"
+}
+
+PS3="Please enter your choice: Following by Enter "
+select option in "${options[@]}"; do
+    case $option in
+        "Burn the DVD")
+            option1
+            break
+            ;;
+        "Exit")
+            option2
+            break
+            ;;
+        *)
+            echo "Invalid option. Try again."
+            ;;
+    esac
+done
+
+
+echo "**********************************************  "
+echo "Mac OS X Install DVD Done !  "
+echo "**********************************************  "

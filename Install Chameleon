@@ -1,0 +1,140 @@
+#!/bin/bash
+# Installer Mac OS X Snow Leopard
+# (c) Copyright 2026 chris1111 
+# This will install Chameleon to the SSD
+PARENTDIR=$(dirname "$0")
+cd "$PARENTDIR"
+
+diskutil list
+
+#get Bootloader Installer path
+if [ "$2" == "" ]; then
+
+echo  "`tput setaf 7``tput sgr0``tput bold``tput setaf 10`Type the disk number then press Enter.`tput sgr0` `tput setaf 7``tput sgr0`  "
+echo  "Exemple: -> `tput setaf 7``tput sgr0``tput bold``tput setaf 10`disk3`tput sgr0` `tput setaf 7``tput sgr0`  "
+echo " "
+while [ -z "$Bootloader" ]; do
+read Bootloader
+# Install Chameleon
+Sleep 2
+cd ./Chameleon/standard/usr/standalone/i386
+sudo fdisk -f boot0 -u -y /dev/r"$Bootloader"
+sudo dd if=boot1h of=/dev/r"$Bootloader"s2
+
+# 1. Get the list of volume names formatted for AppleScript
+volume_list=$(ls /Volumes | awk '{print "\""$0"\""}' | paste -sd, -)
+
+# 2. Trigger the macOS native UI selection window
+selected_volume=$(osascript <<EOT
+    tell application "System Events"
+        activate
+        set chosen to choose from list {$volume_list} with title "Select Volume" with prompt "Choose your Lion disk to proceed:
+Then press the OK button"
+        if chosen is false then
+            return "CANCELLED"
+        else
+            return item 1 of chosen
+        end if
+    end tell
+EOT
+)
+
+# 3. Evaluate user selection
+if [ "$selected_volume" = "CANCELLED" ] || [ -z "$selected_volume" ]; then
+    echo "User cancelled the operation."
+    exit 0
+fi
+
+echo "You choose $selected_volume"
+Sleep 2
+
+osascript <<EOD
+  tell application "Terminal"
+      activate
+  end tell
+EOD
+
+# Copying boot file
+echo  "Copying boot file "
+sudo cp -Rp boot /Volumes/"$selected_volume"
+Sleep 1
+sudo chflags hidden /Volumes/"$selected_volume"/boot
+echo "boot file hidden ${3}/boot"
+
+PARENTDIR=$(dirname "$0")
+cd "$PARENTDIR"
+
+echo " "
+echo "**********************************************  "
+echo "Install Chameleon! to /Volumes/"$selected_volume" "   
+echo "**********************************************  "
+echo "Select 1 for PC or 2 for Laptop
+Type your choice and press Enter."
+
+
+options=("PC" "Laptop")
+
+
+function option1 {
+    echo "You selected PC"
+    sudo cp -Rp ./DVD-PC/* /Volumes/"$selected_volume"
+}
+
+
+function option2 {
+    echo "You selected Laptop"
+    sudo cp -Rp ./DVD-Lptop/* /Volumes/"$selected_volume"
+}
+
+
+PS3="Please enter your choice: Following by Enter "
+select option in "${options[@]}"; do
+    case $option in
+        "PC")
+            option1
+            break
+            ;;
+        "Laptop")
+            option2
+            break
+            ;;
+        *)
+            echo "Invalid option. Try again."
+            ;;
+    esac
+done
+
+install_log=/Volumes/"$selected_volume"/Extra/Chameleon_Install_Log.txt
+# ---------------------------------------------
+# Creating log file
+# ---------------------------------------------
+echo "" > "$install_log"
+echo "Chameleon installer log - $( date )" >> "$install_log"
+echo "Installer version: Chameleon - Enoch v2.4svn -rev 2923" >> "$install_log"
+echo "Built: > By chris1111" >> "$install_log"
+echo "Build Xcode  9.2 (9C40b) ( date 2026-05-04 11:25:01 )" >> "$install_log"
+echo "======================================================" >> "$install_log"
+diskutil list >> "$install_log"
+
+echo "======================================================" >> "${install_log}"
+echo "===== Stage 0 loader not written to /dev/"$Bootloader" ======" >> "${install_log}"
+echo "===== Written boot1h to /dev/r"$Bootloader"s2 =====" >> "${install_log}"
+echo "===== Written boot file on /dev/"$Bootloader"s2 ===" >> "${install_log}"
+echo "========== Chameleon Installation Finish ==========" >> "${install_log}"
+Sleep 2
+
+# Install VoodooHDA
+sudo cp -Rp ./VoodooHDA/Prefpane/VoodooHDA.prefPane /Volumes/"$selected_volume"/Library/PreferencePanes
+sudo cp -Rp ./VoodooHDA/Bin/getdump /Volumes/"$selected_volume"/usr/local/bin
+sudo ./Scripts/Scripts-VoodooHDA/preinstall /"$selected_volume"
+sudo cp -Rp ./VoodooHDA/Kext/VoodooHDA.kext /Volumes/"$selected_volume"/System/Library/Extensions
+sudo cp -Rp ./VoodooHDA/Kext/AppleHDADisabler.kext /Volumes/"$selected_volume"/System/Library/Extensions
+sudo ./Scripts/Scripts-VoodooHDA/postinstall /"$selected_volume"
+# hide usr
+sudo chflags hidden /Volumes/"$selected_volume"/usr
+Sleep 2
+osascript -e 'tell app "loginwindow" to «event aevtrrst»'
+done
+else
+Bootloader="$2"
+fi
