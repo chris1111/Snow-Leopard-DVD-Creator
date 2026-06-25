@@ -34,6 +34,8 @@ Or Download ➤ [Snow Leopard DVD Creator](https://github.com/chris1111/Snow-Leo
 
 ### Get ArticFox a compatible Browser for Snow ➤ [Arctic-Fox](https://github.com/rmottola/Arctic-Fox)
 
+### Usage USB Install Media ➤ [USB Mac OS X Snow Leopard](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md
+
 Please read this NOTE:
 ---------------------
 You can create an iso of Mac OS X Snow Leopard 10.6.7
