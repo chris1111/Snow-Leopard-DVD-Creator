@@ -28,7 +28,7 @@ volume_list=$(ls /Volumes | awk '{print "\""$0"\""}' | paste -sd, -)
 selected_volume=$(osascript <<EOT
     tell application "System Events"
         activate
-        set chosen to choose from list {$volume_list} with title "Select Volume" with prompt "Choose your Lion disk to proceed:
+        set chosen to choose from list {$volume_list} with title "Select Volume" with prompt "Choose your Snow disk to proceed:
 Then press the OK button"
         if chosen is false then
             return "CANCELLED"
