@@ -21,8 +21,12 @@ APFS Drive not accepted!
 #### Post Install: Run `Install Chameleon`
 
 
-### A screenshot at the Chameleon installation stage to the USB ⬇︎
+Usage: Snow USB Creator ⬇︎
 
-<p><img src="Pics/Screenshot-USB.png" alt="Project" style="width:50%;"></p>
+[![Modular Image Creation](https://github.com/user-attachments/assets/28f20acd-0ec4-4a4b-b2be-94abd91b83d5)](https://youtu.be/dYLvpFrPoYY)
 
 
+
+Usage: Install Chameleon ⬇︎
+
+[![Modular Image Creation](https://github.com/user-attachments/assets/28f20acd-0ec4-4a4b-b2be-94abd91b83d5)](https://youtu.be/TByBaSurik8)
