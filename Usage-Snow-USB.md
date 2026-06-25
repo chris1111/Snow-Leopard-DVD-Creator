@@ -19,3 +19,10 @@ APFS Drive not accepted!
 - Run from double clic on `Snow USB Creator`
 
 #### Post Install: Run `Install Chameleon`
+
+
+### A screenshot at the Chameleon installation stage to the USB ⬇︎
+
+<p><img src="Pics/Screenshot-USB.png" alt="Project" style="width:50%;"></p>
+
+
