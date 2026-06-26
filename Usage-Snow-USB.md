@@ -23,10 +23,10 @@ APFS Drive not accepted!
 
 Usage: Snow USB Creator ⬇︎
 
-[![Modular Image Creation](https://github.com/user-attachments/assets/28f20acd-0ec4-4a4b-b2be-94abd91b83d5)](https://youtu.be/dYLvpFrPoYY)
+[![Modular Image Creation](https://github.com/user-attachments/assets/28f20acd-0ec4-4a4b-b2be-94abd91b83d5)](https://youtu.be/ox0mJDCXXVw)
 
 
 
 Usage: Install Chameleon ⬇︎
 
-[![Modular Image Creation](https://github.com/user-attachments/assets/28f20acd-0ec4-4a4b-b2be-94abd91b83d5)](https://youtu.be/TByBaSurik8)
+[![Modular Image Creation](https://github.com/user-attachments/assets/28f20acd-0ec4-4a4b-b2be-94abd91b83d5)](https://youtu.be/WCb8k6zvTag)
