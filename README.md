@@ -1,5 +1,5 @@
 # Snow-Leopard-DVD-Creator 
-- Also [USB Creator](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
+* Also [USB Creator](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
 
 For Hackintosh PC and Laptop
 
