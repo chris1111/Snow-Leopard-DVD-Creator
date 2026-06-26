@@ -5,7 +5,7 @@
 - This program will create a USB Media of Mac OS X Snow Leopard.
 - He will also install Chameleon Bootloader.
 
-#### You need (`Mac OS X Install DVD.dmg`) disk image of [(`10.6.7`)](https://archive.org/download/mac-os-x-install-dvd_202606/Mac%20OS%20X%20Install%20DVD.dmg)
+#### You need (`Mac OS X Install DVD.dmg`) disk image of ➥ [(`10.6.7`)](https://archive.org/download/mac-os-x-install-dvd_202606/Mac%20OS%20X%20Install%20DVD.dmg)
 
 #### Make sure you have a 16 Gig USB drive and that it is properly plugged in.
 
