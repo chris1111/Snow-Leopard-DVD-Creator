@@ -1,4 +1,6 @@
-# Snow-Leopard-DVD-Creator
+# Snow-Leopard-DVD-Creator 
+- Also [USB Creator](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
+
 For Hackintosh PC and Laptop
 
 <p><img src="Pics/Disk.png" alt="Project" style="width:25%;"></p>
