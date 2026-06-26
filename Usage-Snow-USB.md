@@ -1,7 +1,7 @@
 ## Usage: USB Mac OS X Snow Leopard ⬇︎
 
 #### USB Mac OS X Snow Leopard is an Utility for Bios (Legacy) Booting.
-
+- The script is working from 10.6 to macOS 26
 - This program will create a USB Media of Mac OS X Snow Leopard.
 - He will also install Chameleon Bootloader.
 
