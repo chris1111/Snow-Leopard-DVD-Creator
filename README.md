@@ -1,3 +1,5 @@
+[![pages-build-deployment](https://github.com/chris1111/Snow-Leopard-DVD-Creator/actions/workflows/pages/pages-build-deployment/badge.svg?branch=main)](https://github.com/chris1111/Snow-Leopard-DVD-Creato/actions/workflows/pages/pages-build-deployment)
+
 # Snow-Leopard-DVD-Creator 
 * Also [USB Creator](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
 
