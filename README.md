@@ -38,6 +38,8 @@ Or Download ➤ [Snow Leopard DVD Creator](https://github.com/chris1111/Snow-Leo
 
 ### No DVD Usage: USB Install Media ➤ [USB Mac OS X Snow Leopard](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
 
+### Troubleshooting Fix Boot0 GPT ➤ [Fix Boot0 Error](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Fix-Boot0-Error.md)
+
 Please read this NOTE:
 ---------------------
 You can create an iso of Mac OS X Snow Leopard 10.6.7
