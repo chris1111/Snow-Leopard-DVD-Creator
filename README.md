@@ -34,7 +34,7 @@ Or Download ➤ [Snow Leopard DVD Creator](https://github.com/chris1111/Snow-Leo
 
 - You need a 8.5g DVD Double Layer
 
-### Get ArticFox a compatible Browser for Snow ➤ [Arctic-Fox](https://github.com/rmottola/Arctic-Fox)
+### Get ArticFox a compatible Browser for Snow ➤ [Arctic-Fox.pkg](https://github.com/chris1111/Snow-Leopard-DVD-Creator/releases/download/USB-V1/ArticFox.pkg.zip)
 
 ### No DVD Usage: USB Install Media ➤ [USB Mac OS X Snow Leopard](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
 
