@@ -54,4 +54,4 @@ in a folder apart before continue
 ------------------------------------------------------------
 ### Thanks to Chameleon team
 ### Package created by chris1111
-- Chameleon - Enoch v2.4svn -rev 2923 ⟨Build Xcode  9.2 (9C40b) ( date 2026-05-04 11:25:01 )⟩
+- Chameleon - v2.3svn -rev 1-2026 ⟨Build Xcode Version 6.2 (6C131e) (date 2026-07-02 11:47:49)⟩

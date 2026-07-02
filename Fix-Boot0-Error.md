@@ -46,5 +46,5 @@ This command reads the  boot1h file, and then writes it to your hard disk.
 Reboot, and the Chameleon bootscreen will be able to load!
 ----------------------------------------------------------
 Alternatively: 
-if that still doesn't work: Use this program and carefully follow the steps in the Readme
-[Chameleon-MacOS.pkg.zip](https://github.com/user-attachments/files/29510024/Chameleon-MacOS.pkg.zip)
+if that still doesn't work: 
+- Use this program and carefully follow the steps in the Readme ➥ [Chameleon-MacOS.pkg.zip](https://github.com/user-attachments/files/29607622/Chameleon-MacOS.pkg.zip)
