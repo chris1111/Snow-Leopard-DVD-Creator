@@ -47,4 +47,4 @@ Reboot, and the Chameleon bootscreen will be able to load!
 ----------------------------------------------------------
 Alternatively: 
 if that still doesn't work: 
-- Use this program and carefully follow the steps in the Readme ➥ [Chameleon-MacOS.pkg.zip](https://github.com/user-attachments/files/29607622/Chameleon-MacOS.pkg.zip)
+- Use this program and carefully follow the steps in the Readme ➥ [Chameleon-MacOS.pkg.zip](https://github.com/user-attachments/files/29609278/Chameleon-MacOS.pkg.zip)
