@@ -48,9 +48,7 @@ echo  "Exemple: -> `tput setaf 7``tput sgr0``tput bold``tput setaf 10`disk3`tput
 echo " "
 while [ -z "$Bootloader" ]; do
 read Bootloader
-# Install Chameleon
 Sleep 2
-
 # Setup Chameleon EFI
 PARENTDIR=$(dirname "$0")
 cd "$PARENTDIR"
