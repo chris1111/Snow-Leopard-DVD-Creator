@@ -9,7 +9,7 @@ For Hackintosh PC and Laptop
 The size of the DVD to use is 8.5GB.
 ## This package is used in two steps:
 - Step 1: Create the 8.5GB DVD
-- Step 2: Install Chameleon and the Network and Audio Drivers to the SSD were Snow Leopard is installed
+- Step 2: Install Chameleon EFI and the Network and Audio Drivers to the SSD were Snow Leopard is installed
 ### Everything is done manually using bash scripts.
 - Read the script ➥ [Snow Leopard DVD Creator](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Snow%20DVD%20Creator) ➥ [Install Chameleon](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Install%20Chameleon)
 - You can use this utility from Snow Leopard 10.6.7 up to macOS Tahoe 26 to create a DVD.
@@ -37,8 +37,6 @@ Or Download ➤ [Snow Leopard DVD Creator](https://github.com/chris1111/Snow-Leo
 ### Get ArticFox a compatible Browser for Snow ➤ [Arctic-Fox.pkg](https://github.com/chris1111/Snow-Leopard-DVD-Creator/releases/download/USB-V1/ArticFox.pkg.zip)
 
 ### No DVD Usage: USB Install Media ➤ [USB Mac OS X Snow Leopard](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
-
-### Troubleshooting Fix Boot0 GPT ➤ [Fix Boot0 Error](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Fix-Boot0-Error.md)
 
 Please read this NOTE:
 ---------------------

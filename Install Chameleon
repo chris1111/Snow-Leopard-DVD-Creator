@@ -4,22 +4,12 @@
 # This will install Chameleon to the SSD
 PARENTDIR=$(dirname "$0")
 cd "$PARENTDIR"
+rm -rf ./origbs
+rm -rf ./newbs
+rm -rf ./origMBR
+rm -rf ./newMBR
 
 diskutil list
-
-#get Bootloader Installer path
-if [ "$2" == "" ]; then
-
-echo  "`tput setaf 7``tput sgr0``tput bold``tput setaf 10`Type the disk number then press Enter.`tput sgr0` `tput setaf 7``tput sgr0`  "
-echo  "Exemple: -> `tput setaf 7``tput sgr0``tput bold``tput setaf 10`disk3`tput sgr0` `tput setaf 7``tput sgr0`  "
-echo " "
-while [ -z "$Bootloader" ]; do
-read Bootloader
-# Install Chameleon
-Sleep 2
-cd ./Chameleon/standard/usr/standalone/i386
-sudo fdisk -f boot0 -u -y /dev/r"$Bootloader"
-sudo dd if=boot1h of=/dev/r"$Bootloader"s2
 
 # 1. Get the list of volume names formatted for AppleScript
 volume_list=$(ls /Volumes | awk '{print "\""$0"\""}' | paste -sd, -)
@@ -28,7 +18,7 @@ volume_list=$(ls /Volumes | awk '{print "\""$0"\""}' | paste -sd, -)
 selected_volume=$(osascript <<EOT
     tell application "System Events"
         activate
-        set chosen to choose from list {$volume_list} with title "Select Volume" with prompt "Choose your Snow disk to proceed:
+        set chosen to choose from list {$volume_list} with title "Install BootSector" with prompt "Choose your Snow disk to proceed:
 Then press the OK button"
         if chosen is false then
             return "CANCELLED"
@@ -46,47 +36,92 @@ if [ "$selected_volume" = "CANCELLED" ] || [ -z "$selected_volume" ]; then
 fi
 
 echo "You choose $selected_volume"
+# Copying boot sector
+sudo cp -Rp ./Chameleon/standard/* /Volumes/"$selected_volume"
+# hide usr
+sudo chflags hidden /Volumes/"$selected_volume"/usr
+#get Bootloader Installer path
+if [ "$2" == "" ]; then
+
+echo  "`tput setaf 7``tput sgr0``tput bold``tput setaf 10`Type the disk number then press Enter.`tput sgr0` `tput setaf 7``tput sgr0`  "
+echo  "Exemple: -> `tput setaf 7``tput sgr0``tput bold``tput setaf 10`disk3`tput sgr0` `tput setaf 7``tput sgr0`  "
+echo " "
+while [ -z "$Bootloader" ]; do
+read Bootloader
+# Install Chameleon
 Sleep 2
 
-osascript <<EOD
-  tell application "Terminal"
-      activate
-  end tell
-EOD
-
-# Copying boot file
-echo  "Copying boot file "
-sudo cp -Rp boot /Volumes/"$selected_volume"
-Sleep 1
-sudo chflags hidden /Volumes/"$selected_volume"/boot
-echo "boot file hidden ${3}/boot"
-
+# Setup Chameleon EFI
 PARENTDIR=$(dirname "$0")
 cd "$PARENTDIR"
+PC="./DVD-PC/Extra"
+LAPTOP="./DVD-PC/Extra"
+diskloader="./Chameleon/standard/usr/standalone/i386/boot0"
+booter="./Chameleon/standard/usr/standalone/i386/boot"
+partitionloaderfat="./Chameleon/standard/usr/standalone/i386/boot1f32"
+# Write MBR
+sudo fdisk -uy -f $diskloader /dev/r"$Bootloader" || exit 1
+sudo dd if=/dev/r"$Bootloader" count=1 bs=512 of=origMBR
+sudo cp ./origMBR ./newMBR
+sudo dd if=$diskloader of=origMBR bs=440 count=1 conv=notrunc
+sudo fdisk -f ./newMBR -u -y /dev/"$Bootloader"
+sudo dd if=/dev/r"$Bootloader"s1 count=1 bs=512 of=origbs
+sudo cp -v $partitionloaderfat newbs
+sudo dd if=origbs of=newbs skip=3 seek=3 bs=1 count=87 conv=notrunc
+sudo dd if=newbs of=/dev/"$Bootloader"s1 count=1 bs=512
+diskutil umount "$Bootloader"s1
+# Create temp Mount Point
+EFIPart="/Private/tmp/PartEFI"
+mkdir -p "$EFIPart"
+sudo umount -f "$EFIPart"
+sudo mount -t msdos /dev/"$Bootloader"s1 "$EFIPart"
+cp -v "$booter" "$EFIPart/boot"
+Sleep 2
+sudo fdisk -e /dev/r"$Bootloader" <<-MAKEACTIVE
+p
+f 1
+w
+y
+q
+MAKEACTIVE
 
 echo " "
-echo "**********************************************  "
-echo "Install Chameleon! to /Volumes/"$selected_volume" "   
-echo "**********************************************  "
-echo "Select 1 for PC or 2 for Laptop
-Type your choice and press Enter."
+
+Sleep 2
+# Menu options
+echo "Install Chameleon Extra Folder "
+echo "=========================================== "
+echo "1) Type 1 if you use a PC "
+echo "=========================================== "
+echo "2) Type 2 if you use a Laptop "  
+echo "=========================================== "
+
+echo "= = = = = = = = = = = = = = = = = = = = = = = = =  "
+
+options=("PC" "LAPTOP")
 
 
-options=("PC" "Laptop")
-
-
+# Function 1
 function option1 {
-    echo "You selected PC"
-    sudo cp -Rp ./DVD-PC/* /Volumes/"$selected_volume"
+echo "You selected PC"
+Sleep 2
+rm -rf "$EFIPart/Extra"
+Sleep 1
+cp -Rp "$PC" "$EFIPart"
+echo "Installing Extra -> /dev/"$Bootloader"s1 "
 }
 
-
+# Function 2
 function option2 {
-    echo "You selected Laptop"
-    sudo cp -Rp ./DVD-Lptop/* /Volumes/"$selected_volume"
+echo "You selected LAPTOP"
+Sleep 2
+rm -rf "$EFIPart/Extra"
+Sleep 1
+cp -Rp "$LAPTOP" "$EFIPart"
+echo "Installing Extra -> /dev/"$Bootloader"s1 "
 }
 
-
+# Display menu
 PS3="Please enter your choice: Following by Enter "
 select option in "${options[@]}"; do
     case $option in
@@ -94,7 +129,7 @@ select option in "${options[@]}"; do
             option1
             break
             ;;
-        "Laptop")
+        "LAPTOP")
             option2
             break
             ;;
@@ -104,7 +139,25 @@ select option in "${options[@]}"; do
     esac
 done
 
-install_log=/Volumes/"$selected_volume"/Extra/Chameleon_Install_Log.txt
+Sleep 1
+rm -rf ./origbs
+rm -rf ./newbs
+rm -rf ./origMBR
+rm -rf ./newMBR
+echo "Done!"
+
+# Define target disk
+TARGET_DISK="/dev/r$Bootloader"
+# Capture the entire output of fdisk for the target disk
+FULL_LAYOUT=$(sudo fdisk "$TARGET_DISK" 2>/dev/null)
+
+# Verify if fdisk managed to capture anything
+if [ -z "$FULL_LAYOUT" ]; then
+  echo "Error: Could not read $TARGET_DISK. Ensure the drive is mounted."
+  exit 1
+fi
+
+install_log="$EFIPart/Extra/Chameleon_Install_Log.txt"
 # ---------------------------------------------
 # Creating log file
 # ---------------------------------------------
@@ -115,24 +168,31 @@ echo "Built: > By chris1111" >> "$install_log"
 echo "Build Xcode Version 6.2 (6C131e) ( date 2026-07-02 11:47:49 )" >> "$install_log"
 echo "======================================================" >> "$install_log"
 diskutil list >> "$install_log"
-
+echo "================= Chameleon EFI ==================" >> "${install_log}"
+echo " " >> "${install_log}"
+echo "======================================================" >> "$install_log"
+echo "Written boot0 to /dev/"$Bootloader"." >> "$install_log"
+echo "Written boot1f32 to /dev/r"$Bootloader"s1." >> "$install_log"
+echo "Mounting /dev/"$Bootloader"s1 as /Volumes/EFI." >> "$install_log"
+echo "Written boot to /Volumes/EFI." >> "$install_log"
+echo "Checking "$Bootloader"." >> "$install_log"
+echo "Nothing found that could cause any problems." >> "$install_log"
+echo "======================================================" >> "$install_log"
+echo "$FULL_LAYOUT" >> "$install_log"
+echo "======================================================" >> "$install_log"
+echo " " >> "${install_log}"
+echo "Setting /Volumes/"$selected_volume" partition active." >> "$install_log"
 echo "======================================================" >> "${install_log}"
-echo "===== Stage 0 loader not written to /dev/"$Bootloader" ======" >> "${install_log}"
-echo "===== Written boot1h to /dev/r"$Bootloader"s2 =====" >> "${install_log}"
-echo "===== Written boot file on /dev/"$Bootloader"s2 ===" >> "${install_log}"
+echo "======================================================" >> "${install_log}"
 echo "========== Chameleon Installation Finish ==========" >> "${install_log}"
-Sleep 2
-
 # Install VoodooHDA
 sudo cp -Rp ./VoodooHDA/Prefpane/VoodooHDA.prefPane /Volumes/"$selected_volume"/Library/PreferencePanes
 sudo cp -Rp ./VoodooHDA/Bin/getdump /Volumes/"$selected_volume"/usr/local/bin
 sudo ./Scripts/Scripts-VoodooHDA/preinstall /"$selected_volume"
 sudo cp -Rp ./VoodooHDA/Kext/VoodooHDA.kext /Volumes/"$selected_volume"/System/Library/Extensions
 sudo cp -Rp ./VoodooHDA/Kext/AppleHDADisabler.kext /Volumes/"$selected_volume"/System/Library/Extensions
-sudo ./Scripts/Scripts-VoodooHDA/postinstall /"$selected_volume"
-# hide usr
-sudo chflags hidden /Volumes/"$selected_volume"/usr
-Sleep 2
+sudo ./Scripts/Scripts-VoodooHDA/postinstall /"$selected_volume" 
+Sleep 1
 osascript -e 'tell app "loginwindow" to «event aevtrrst»'
 done
 else
