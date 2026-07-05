@@ -1,3 +1,5 @@
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](Snow-Leopard-DVD-Creator/blob/main/LICENSE)[![pages-build-deployment](https://github.com/chris1111/Snow-Leopard-DVD-Creator/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/chris1111/Snow-Leopard-DVD-Creator/actions/workflows/pages/pages-build-deployment)
+
 # Snow-Leopard-DVD-Creator 
 * Also [USB Creator](https://github.com/chris1111/Snow-Leopard-DVD-Creator/blob/main/Usage-Snow-USB.md)
 
