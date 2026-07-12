@@ -54,4 +54,4 @@ in a folder apart before continue
 ------------------------------------------------------------
 ### Thanks to Chameleon team
 ### Package created by chris1111
-- Chameleon - v2.4svn -rev 2923 ⟨Build Xcode Version 9.4.1 (9F2000)⟩
+- Chameleon - v2.4svn -rev 2923 ⟨Build Xcode Version 9.4.1 (9F2000)⟩ [Source Code](https://github.com/chris1111/Chameleon)
