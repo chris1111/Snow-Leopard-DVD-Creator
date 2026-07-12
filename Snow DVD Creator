@@ -168,6 +168,24 @@ select option in "${options[@]}"; do
     esac
 done
 
+install_log="/Volumes/Mac-OSX-Install-DVD/Extra/Chameleon_Install_Log.txt"
+# ---------------------------------------------
+# Creating log file
+# ---------------------------------------------
+echo "" > "$install_log"
+echo "Chameleon installer log - $( date )" >> "$install_log"
+echo "Installer version: Chameleon - v2.4svn -rev 2923" >> "$install_log"
+echo "Built: > By chris1111" >> "$install_log"
+echo "Build Xcode Version 9.4.1 (9F2000)" >> "$install_log"
+echo "======================================================" >> "$install_log"
+diskutil list >> "$install_log"
+
+echo "======================================================" >> "${install_log}"
+echo "========== Using cdboot to /Volumes/Mac-OSX-Install-DVD ===========" >> "${install_log}"
+echo "============= No Active Partition ===================" >> "${install_log}"
+echo "=========== Chameleon Installation Finish ===========" >> "${install_log}"
+Sleep 2
+
 Sleep 2
 # hidden folder and file
 chflags hidden /Volumes/Mac-OSX-Install-DVD/usr

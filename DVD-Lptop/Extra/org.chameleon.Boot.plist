@@ -14,8 +14,6 @@
 	<string>Yes</string>
 	<key>Legacy Logo</key>
 	<string>No</string>
-	<key>Kernel</key>
-	<string>mach_kernel</string>
 	<key>Kernel Flags</key>
 	<string>darkwake=0 npci=0x3000 arch=x86_64 dart=0 PCIRootUID=1</string>
 	<key>UseKernelCache</key>
