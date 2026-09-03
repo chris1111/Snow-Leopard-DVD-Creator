@@ -107,10 +107,10 @@ echo "Selected: $DMG_PATH"
 # extension check — all three cases handled (the original let non-.dmg/.iso files through)
 case "$DMG_PATH" in
     *.dmg|*.DMG)
-        echo "The file is a DMG image ✅"
+        echo "The file is a DMG image"
         ;;
     *.iso|*.ISO)
-        echo "The file is not a DMG image 🚫
+        echo "The file is not a DMG image
 You need to use a DMG of Mac OS X Install DVD!
 Convert your image then retry."
         dialog_ok "You need to use a DMG of Mac OS X Install DVD. Convert your image then retry."
