@@ -1,267 +1,243 @@
 #!/bin/bash
 # Installer Mac OS X Snow Leopard
-# (c) Copyright 2026 chris1111 
+# (c) Copyright 2026 chris1111
 # This will create an iso of Mac OS X Snow Leopard
-PARENTDIR=$(dirname "$0")
-cd "$PARENTDIR"
-# Vars
-apptitle="Installer Mac OS X Snow Leopard"
-version="1.0"
-# Set Icon directory and file 
-iconfile="/System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns"
-find . -name '.DS_Store' -type f -delete
+# Refactored: same steps, fixed validation, added checks and auto-cleanup.
+set -u
 
-# Select choice
-response=$(osascript -e 'tell app "System Events" to display dialog "This program will create a bootable ISO image of Mac OS X Snow Leopard.
+# --- configuration ----------------------------------------------------------------
+APPTITLE="Installer Mac OS X Snow Leopard"
+VERSION="1.0"
+ICON="/System/Library/CoreServices/Finder.app/Contents/Resources/Finder.icns"
 
-Please read this NOTE:
----------------------
-You can create an iso of Mac OS X Snow Leopard 10.6.7 only!
+DVD_MOUNT="/Volumes/Mac-OSX-Install-DVD"
+SPARSE="/private/tmp/MacOS.sparseimage"
+ISO="$HOME/Desktop/Mac OS X Install DVD.iso"
 
-If you have already create 
-Mac OS X Install DVD.iso on the desktop, 
-it will automatically deleted by the script. 
+# --- helpers ------------------------------------------------------------------------
+banner() {
+    printf '\n**********************************************\n%s\n**********************************************\n' "$*"
+}
 
-So If you would like to create more disk images; put the images 
-in a folder apart before continue.\n\nSelect OK to Continue 
-Cancel to Quit" buttons {"Cancel","OK"} default button 2 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'"  ')
+notify() {
+    osascript -e "display notification \"$1\" with title \"$APPTITLE\" subtitle \"$2\"" >/dev/null 2>&1 || true
+}
 
-action=$(echo $response | cut -d ':' -f2)
-
-# Exit if Canceled
-if [ ! "$action" ] ; then
-  osascript -e 'display notification "Program closing" with title "'"$apptitle"'" subtitle "User cancelled"'
-  exit 0
-fi
-
-if [[ $(mount | awk '$3 == "/Volumes/Mac-OSX-Install-DVD" {print $3}') != "" ]]; then
- hdiutil detach -Force "/Volumes/Mac-OSX-Install-DVD"
-fi
-
-if [[ -d "/Volumes/Mac OS X Install DVD" ]]; then
- hdiutil detach -Force "/Volumes/Mac OS X Install DVD"
-fi
-
-if [ "/Private/tmp/Mac-OSX.sparseimage" ]; then
-	rm -rf "/Private/tmp/MacOS.sparseimage"
-fi
-
-echo "**********************************************  "
-echo "Starting Mac OS X Install DVD! " 
-
-# Get image file location
-  imagepath=`/usr/bin/osascript << EOT
-    tell application "Finder"
-        activate
-        set imagefilepath to choose file default location "$HOME/Desktop" with prompt "Choose your Mac OS X Install DVD.dmg"
-    end tell 
-    return (posix path of imagefilepath) 
-  EOT`
-
-  # Cancel is user selects Cancel
-  if [ ! "$imagepath" ] ; then
-    osascript -e 'display notification "Program closing" with title "'"$apptitle"'" subtitle "User cancelled"'
+cancelled() {
+    notify "Program closing" "User cancelled"
     exit 0
-  fi
+}
 
-osascript <<EOD
-  tell application "Terminal"
-      activate
-  end tell
-EOD
+focus_terminal() {
+    osascript -e 'tell application "Terminal" to activate' >/dev/null 2>&1 || true
+}
 
-# Check if the variable ends with .dmg
-if [[ "$imagepath" == *.dmg ]]; then
-    echo "The file is a DMG image OK ✅"
-else 
+fail() {
+    echo "ERROR: $*" >&2
+    dialog_ok "ERROR: $*"
+    exit 1
+}
 
-if [[ "$imagepath" == *.iso ]]; then
-    echo "The file is not a DMG image 🚫
+dialog_ok() {
+    osascript - "$1" "$APPTITLE $VERSION" "$ICON" >/dev/null 2>&1 <<'OSA'
+on run {msg, ttl, iconFile}
+    tell application "System Events"
+        display dialog msg buttons {"OK"} default button 1 with title ttl with icon POSIX file iconFile giving up after 8
+    end tell
+end run
+OSA
+}
+
+intro_dialog() {
+    local msg
+    msg=$(printf '%s\n\n%s\n%s\n\n%s' \
+        "This program will create a bootable ISO image of Mac OS X Snow Leopard." \
+        "NOTE:" \
+        "You can create an ISO of Mac OS X Snow Leopard 10.6.7 only! If a \"Mac OS X Install DVD.iso\" already exists on the Desktop it will be deleted by this script. Move any images you want to keep elsewhere before continuing." \
+        "Select OK to continue, Cancel to quit.")
+    osascript - "$msg" "$APPTITLE $VERSION" "$ICON" >/dev/null 2>&1 <<'OSA'
+on run {msg, ttl, iconFile}
+    tell application "System Events"
+        display dialog msg buttons {"Cancel", "OK"} default button 2 with title ttl with icon POSIX file iconFile
+    end tell
+end run
+OSA
+}
+
+choose_dmg() {
+    osascript 2>/dev/null <<EOT
+tell application "Finder"
+    activate
+    set f to choose file default location "$HOME/Desktop" with prompt "Choose your Mac OS X Install DVD.dmg"
+    return POSIX path of f
+end tell
+EOT
+}
+
+# --- always clean up, even on error or Ctrl-C ------------------------------------------
+cleanup() {
+    hdiutil detach -force "$DVD_MOUNT" >/dev/null 2>&1 || true
+    hdiutil detach -force "/Volumes/Mac OS X Install DVD" >/dev/null 2>&1 || true
+    [ -e "$SPARSE" ] && rm -rf "$SPARSE"
+    true
+}
+trap cleanup EXIT
+
+# --- start --------------------------------------------------------------------------------
+[ "$(uname)" = "Darwin" ] || { echo "This script must run on macOS." >&2; exit 1; }
+
+PARENTDIR=$(dirname "$0")
+cd "$PARENTDIR" || exit 1
+find . -name '.DS_Store' -type f -delete 2>/dev/null
+
+intro_dialog || cancelled
+
+banner "Starting Mac OS X Install DVD!"
+
+# detach leftovers from previous runs
+hdiutil detach -force "$DVD_MOUNT" >/dev/null 2>&1 || true
+hdiutil detach -force "/Volumes/Mac OS X Install DVD" >/dev/null 2>&1 || true
+[ -e "$SPARSE" ] && rm -rf "$SPARSE"
+
+# --- choose the DMG --------------------------------------------------------------------
+DMG_PATH="$(choose_dmg)" || cancelled
+[ -n "$DMG_PATH" ] || cancelled
+echo "Selected: $DMG_PATH"
+
+# extension check — all three cases handled (the original let non-.dmg/.iso files through)
+case "$DMG_PATH" in
+    *.dmg|*.DMG)
+        echo "The file is a DMG image ✅"
+        ;;
+    *.iso|*.ISO)
+        echo "The file is not a DMG image 🚫
 You need to use a DMG of Mac OS X Install DVD!
 Convert your image then retry."
-    osascript -e 'tell app "System Events" to display dialog "You need to use a DMG of Mac OS X Install DVD
-Convert your image then retry.\n\n" buttons {"EXIT"} default button 1 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'" giving up after 10'
-    exit 0
-fi
+        dialog_ok "You need to use a DMG of Mac OS X Install DVD. Convert your image then retry."
+        exit 0
+        ;;
+    *)
+        fail "This is not a DMG image. Please choose the Mac OS X Install DVD.dmg."
+        ;;
+esac
 
-fi
+hdiutil imageinfo "$DMG_PATH" >/dev/null 2>&1 || fail "This file can't be read as a disk image."
 
-osascript <<EOD
-  tell application "Terminal"
-      activate
-  end tell
-EOD
-
-
-# Get the size in Megabytes (6GB = 6000MB)
-SIZE_MB=$(du -sm "$imagepath" | awk '{print $1}')
-
+# --- size check (6 GB = 6000 MB) -----------------------------------------------------------
+SIZE_MB=$(du -sm "$DMG_PATH" | awk '{print $1}')
 if [ "$SIZE_MB" -lt 6000 ]; then
-    echo "This image is lower than 6g."
-    osascript -e 'tell app "System Events" to display dialog "You need the 10.6.7 Image! This is not good.\n\n" buttons {"EXIT"} default button 1 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'" giving up after 5'
-    rm -rf "/Private/tmp/MacOS.sparseimage"
-    osascript -e 'display notification "Program closing" with title "'"$apptitle"'" subtitle "User cancelled"'
+    echo "This image is lower than 6 GB ($SIZE_MB MB)."
+    dialog_ok "You need the 10.6.7 Image! This is not good."
     exit 0
-else
-    echo "Success: This image is 6g and higher ($SIZE_MB MB)."
-    osascript -e 'tell app "System Events" to display dialog "Reminder: You need a 8.5g DVD Double Layer for this Image.\n\n" buttons {"OK"} default button 1 with title "'"$apptitle"' '"$version"'" with icon POSIX file "'"$iconfile"'" giving up after 5'
 fi
+echo "Success: this image is 6 GB or larger ($SIZE_MB MB)."
+dialog_ok "Reminder: You need an 8.5 GB DVD Double Layer for this image."
 
-# Convert the image
-hdiutil convert "$imagepath" -format UDSP -o /Private/tmp/MacOS
-# Increase the sparse bundle capacity
-hdiutil resize -size 8.1g /Private/tmp/MacOS.sparseimage
+# --- convert ------------------------------------------------------------------------------
+echo "Converting the image (this can take a while)..."
+hdiutil convert "$DMG_PATH" -format UDSP -o /private/tmp/MacOS || fail "hdiutil convert failed."
+[ -f "$SPARSE" ] || fail "The sparse image was not created."
+hdiutil resize -size 8.1g "$SPARSE" 2>/dev/null || echo "Keeping the original size (source is already 8.1 GB or more)."
+sleep 2
 
-Sleep 2
+# old ISO is deleted only now, once we are committed (same order as the original)
+[ -e "$ISO" ] && { echo "Removing existing: $ISO"; rm -f "$ISO"; }
 
-if [ "/$HOME/Desktop/Mac OS X Install DVD.iso" ]; then
-	rm -rf "/$HOME/Desktop/Mac OS X Install DVD.iso"
-fi
+# --- mount and populate ---------------------------------------------------------------------
+mkdir -p "$DVD_MOUNT"
+hdiutil attach "$SPARSE" -noverify -nobrowse -mountpoint "$DVD_MOUNT" || fail "Could not mount the sparse image."
+focus_terminal
 
+echo "Copying the package..."
+mkdir -p "$DVD_MOUNT/Snow DVD Creator"
+cp -Rp ./* "$DVD_MOUNT/Snow DVD Creator/" || fail "Could not copy the package to the DVD volume."
 
-# Mount the sparse bundle for package addition
-hdiutil attach /Private/tmp/MacOS.sparseimage -noverify -nobrowse -mountpoint /Volumes/Mac-OSX-Install-DVD
-
-osascript <<EOD
-  tell application "Terminal"
-      activate
-  end tell
-EOD
-
-echo "Copying Packages"
-mkdir -p /Volumes/Mac-OSX-Install-DVD/"Snow DVD Creator"
-Sleep 1
-cp -Rp ./* /Volumes/Mac-OSX-Install-DVD/"Snow DVD Creator"
-
-echo " "
-echo "**********************************************  "
-echo "Install Chameleon! "   
-echo "**********************************************  "
-echo "Select 1 for PC or 2 for Laptop "
-
-options=("PC" "Laptop")
-
-function option1 {
-    echo "You selected PC."
-    cp -Rp ./DVD-PC/* /Volumes/Mac-OSX-Install-DVD
-}
-
-function option2 {
-    echo "You selected Laptop."
-    cp -Rp ./DVD-Lptop/* /Volumes/Mac-OSX-Install-DVD
-}
-
-PS3="Please enter your choice: Following by Enter "
-select option in "${options[@]}"; do
-    case $option in
-        "PC")
-            option1
+# --- Chameleon: PC or Laptop -------------------------------------------------------------------
+banner "Install Chameleon!"
+echo "Select 1 for PC or 2 for Laptop."
+PS3="Please enter your choice (1-2): "
+select opt in "PC" "Laptop"; do
+    case "$opt" in
+        PC)
+            echo "You selected PC."
+            [ -d "./DVD-PC" ] || fail "Missing folder: ./DVD-PC"
+            cp -Rp ./DVD-PC/* "$DVD_MOUNT/" || fail "DVD-PC copy failed."
             break
             ;;
-        "Laptop")
-            option2
+        Laptop)
+            echo "You selected Laptop."
+            [ -d "./DVD-Lptop" ] || fail "Missing folder: ./DVD-Lptop"
+            cp -Rp ./DVD-Lptop/* "$DVD_MOUNT/" || fail "DVD-Lptop copy failed."
             break
             ;;
-        *)
-            echo "Invalid option. Try again."
-            ;;
+        *) echo "Invalid option. Try again." ;;
     esac
 done
 
-install_log="/Volumes/Mac-OSX-Install-DVD/Extra/Chameleon_Install_Log.txt"
-# ---------------------------------------------
-# Creating log file
-# ---------------------------------------------
-echo "" > "$install_log"
-echo "Chameleon installer log - $( date )" >> "$install_log"
-echo "Installer version: Chameleon - v2.4svn -rev 2923" >> "$install_log"
-echo "Built: > By chris1111" >> "$install_log"
-echo "Build Xcode Version 9.4.1 (9F2000)" >> "$install_log"
-echo "======================================================" >> "$install_log"
-diskutil list >> "$install_log"
+# --- log -----------------------------------------------------------------------------------------
+mkdir -p "$DVD_MOUNT/Extra"
+install_log="$DVD_MOUNT/Extra/Chameleon_Install_Log.txt"
+{
+    echo ""
+    echo "Chameleon installer log - $(date)"
+    echo "Installer version: Chameleon - v2.4svn -rev 2923"
+    echo "Built: > By chris1111"
+    echo "Build Xcode Version 9.4.1 (9F2000)"
+    echo "======================================================"
+    diskutil list
+    echo "======================================================"
+    echo "========== Using cdboot to $DVD_MOUNT ============"
+    echo "============= No Active Partition ==================="
+    echo "=========== Chameleon Installation Finish ==========="
+} > "$install_log"
 
-echo "======================================================" >> "${install_log}"
-echo "========== Using cdboot to /Volumes/Mac-OSX-Install-DVD ===========" >> "${install_log}"
-echo "============= No Active Partition ===================" >> "${install_log}"
-echo "=========== Chameleon Installation Finish ===========" >> "${install_log}"
-Sleep 2
+sleep 2
+chflags hidden "$DVD_MOUNT/usr" 2>/dev/null || true
 
-Sleep 2
-# hidden folder and file
-chflags hidden /Volumes/Mac-OSX-Install-DVD/usr
+# --- shrink, remount, makehybrid ---------------------------------------------------------------------
+hdiutil detach -force "$DVD_MOUNT"
+hdiutil resize -size "$(hdiutil resize -limits "$SPARSE" | tail -n 1 | awk '{print $1}')b" "$SPARSE"
+sleep 2
+hdiutil attach "$SPARSE" -noverify -nobrowse -mountpoint "$DVD_MOUNT" || fail "Could not re-mount the sparse image."
+focus_terminal
 
-# Unmount the dmg image
-hdiutil detach -Force /Volumes/Mac-OSX-Install-DVD
+CDBOOT="$DVD_MOUNT/usr/standalone/i386/cdboot"
+[ -f "$CDBOOT" ] || fail "cdboot not found — is this really the Mac OS X Install DVD?"
 
-# Resize the partition in the sparse bundle to remove any free space
-hdiutil resize -size `hdiutil resize -limits /Private/tmp/MacOS.sparseimage | tail -n 1 | awk '{ print $1 }'`b /Private/tmp/MacOS.sparseimage
+banner "Create ISO image — type your password!"
+sudo hdiutil makehybrid -o "$ISO" "$DVD_MOUNT" -iso -hfs -joliet \
+    -eltorito-boot "$CDBOOT" -no-emul-boot \
+    -hfs-volume-name "Mac OS X Install DVD" \
+    -joliet-volume-name "Mac OS X Install DVD" || fail "makehybrid failed."
+[ -f "$ISO" ] || fail "The ISO was not created."
 
-Sleep 2
-# Mount the dmg image
-hdiutil attach /Private/tmp/MacOS.sparseimage -noverify -nobrowse -mountpoint /Volumes/Mac-OSX-Install-DVD
+banner "Unmount installer image!"
+sleep 1
+hdiutil detach -force "$DVD_MOUNT"
+sleep 1
+rm -rf "$SPARSE"
 
-osascript <<EOD
-  tell application "Terminal"
-      activate
-  end tell
-EOD
-
-echo " "
-echo "**********************************************  "
-echo "Create iso image 
-Type Your Password!"   
-echo "**********************************************  "
-echo " "
-# Create ISO image
-sudo hdiutil makehybrid -o "$HOME/Desktop/Mac OS X Install DVD.iso" "/Volumes/Mac-OSX-Install-DVD" -iso -hfs -joliet -eltorito-boot "/Volumes/Mac-OSX-Install-DVD/usr/standalone/i386/cdboot" -no-emul-boot -hfs-volume-name "Mac OS X Install DVD" -joliet-volume-name "Mac OS X Install DVD"
-
-echo "**********************************************  "
-echo "Unmount Installer image!  "
-echo "**********************************************  "
-Sleep 1
-hdiutil detach -Force /Volumes/"Mac-OSX-Install-DVD"
-Sleep 1
-# Remove dmg and Clover
-rm -rf /Private/tmp/MacOS.sparseimage
-
-echo " "
-echo "**********************************************  "
-echo "Burning DVD! "   
-echo "**********************************************  "
-
-options=("Burn the DVD" "Exit")
-
-function option1 {
-    echo "You selected Burn the DVD."
-    hdiutil burn -noverifyburn $HOME/Desktop/"Mac OS X Install DVD.iso"
-    Sleep 1
-    Open -R ~/Desktop/"Mac OS X Install DVD.iso"
-}
-
-function option2 {
-    echo "You selected to Quit."
-    Sleep 1
-    Open -R ~/Desktop/"Mac OS X Install DVD.iso"
-}
-
-PS3="Please enter your choice: Following by Enter "
-select option in "${options[@]}"; do
-    case $option in
+# --- burn or exit --------------------------------------------------------------------------------------
+banner "Burning DVD!"
+PS3="Please enter your choice (1-2): "
+select opt in "Burn the DVD" "Exit"; do
+    case "$opt" in
         "Burn the DVD")
-            option1
+            echo "You selected Burn the DVD."
+            hdiutil burn -noverifyburn "$ISO" || echo "Burning failed."
+            sleep 1
+            open -R "$ISO"
             break
             ;;
         "Exit")
-            option2
+            echo "You selected to Quit."
+            sleep 1
+            open -R "$ISO"
             break
             ;;
-        *)
-            echo "Invalid option. Try again."
-            ;;
+        *) echo "Invalid option. Try again." ;;
     esac
 done
 
-
-echo "**********************************************  "
-echo "Mac OS X Install DVD Done !  "
-echo "**********************************************  "
+banner "Mac OS X Install DVD Done!"
+exit 0

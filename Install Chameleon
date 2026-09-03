@@ -1,24 +1,56 @@
 #!/bin/bash
-# Installer Mac OS X Snow Leopard
-# (c) Copyright 2026 chris1111 
+# Installer Snow Leopard — Post Install
+# (c) Copyright 2026 chris1111
 # This will install Chameleon to the SSD
+
 PARENTDIR=$(dirname "$0")
 cd "$PARENTDIR"
-rm -rf ./origbs
-rm -rf ./newbs
-rm -rf ./origMBR
-rm -rf ./newMBR
+
+# --- configuration ---------------------------------------------------------------
+EFIPART="/private/tmp/PartEFI"
+BOOT0="./Chameleon/standard/usr/standalone/i386/boot0"
+BOOTER="./Chameleon/standard/usr/standalone/i386/boot"
+BOOT1F32="./Chameleon/standard/usr/standalone/i386/boot1f32"
+PC_DIR="./DVD-PC/Extra"
+LAPTOP_DIR="./DVD-Lptop/Extra"
+
+# --- cleanup on exit: NEVER unmounts the EFI partition, only temp files ------------
+cleanup() {
+    rm -rf ./origbs ./newbs ./origMBR ./newMBR 2>/dev/null
+    true
+}
+trap cleanup EXIT
+
+fail() {
+    echo "ERROR: $*" >&2
+    exit 1
+}
+
+# --- fail fast: verify every resource BEFORE touching any disk ----------------------
+for f in "$BOOT0" "$BOOTER" "$BOOT1F32" \
+         "./VoodooHDA/Prefpane/VoodooHDA.prefPane" \
+         "./VoodooHDA/Bin/getdump" \
+         "./VoodooHDA/Kext/VoodooHDA.kext" \
+         "./VoodooHDA/Kext/AppleHDADisabler.kext" \
+         "./Scripts/Scripts-VoodooHDA/preinstall" \
+         "./Scripts/Scripts-VoodooHDA/postinstall"; do
+    [ -e "$f" ] || fail "Required file/folder not found: $f"
+done
+
+sudo -v   # ask for the password once, up front
+
+rm -rf ./origbs ./newbs ./origMBR ./newMBR
 
 diskutil list
 
-# 1. Get the list of volume names formatted for AppleScript
+# --- 1. volume list formatted for AppleScript ----------------------------------------
 volume_list=$(ls /Volumes | awk '{print "\""$0"\""}' | paste -sd, -)
 
-# 2. Trigger the macOS native UI selection window
+# --- 2. native selection window --------------------------------------------------------
 selected_volume=$(osascript <<EOT
     tell application "System Events"
         activate
-        set chosen to choose from list {$volume_list} with title "Install BootSector" with prompt "Choose your Snow disk to proceed:
+        set chosen to choose from list {$volume_list} with title "Install BootSector" with prompt "Choose your Snow Leopard disk to proceed:
 Then press the OK button"
         if chosen is false then
             return "CANCELLED"
@@ -29,53 +61,92 @@ Then press the OK button"
 EOT
 )
 
-# 3. Evaluate user selection
-if [ "$selected_volume" = "CANCELLED" ] || [ -z "$selected_volume" ]; then
+# --- 3. evaluate user selection ----------------------------------------------------------
+if [ -z "$selected_volume" ] || [ "$selected_volume" = "CANCELLED" ]; then
     echo "User cancelled the operation."
     exit 0
 fi
 
 echo "You choose $selected_volume"
-# Copying boot sector
-sudo cp -Rp ./Chameleon/standard/* /Volumes/"$selected_volume"
-# hide usr
-sudo chflags hidden /Volumes/"$selected_volume"/usr
-#get Bootloader Installer path
-if [ "$2" == "" ]; then
+TARGET_VOL="/Volumes/$selected_volume"
+[ -d "$TARGET_VOL" ] || fail "Volume '$selected_volume' is not mounted."
 
-echo  "`tput setaf 7``tput sgr0``tput bold``tput setaf 10`Type the disk number then press Enter.`tput sgr0` `tput setaf 7``tput sgr0`  "
-echo  "Exemple: -> `tput setaf 7``tput sgr0``tput bold``tput setaf 10`disk3`tput sgr0` `tput setaf 7``tput sgr0`  "
+# detect the disk of the chosen volume (used as default below and in the cross-check)
+VOL_DISK=$(diskutil info "$TARGET_VOL" 2>/dev/null | awk '/Part of Whole:/{print $NF}')
+
+# copy boot files to the target volume, hide usr
+sudo cp -Rp ./Chameleon/standard/* "$TARGET_VOL/"
+[ -d "$TARGET_VOL/usr" ] && sudo chflags hidden "$TARGET_VOL/usr"
+
+# --- 4. which disk? ($2 overrides; otherwise default to the detected disk) -----------------
+if [ -n "${2:-}" ]; then
+    Bootloader="$2"
+elif [ -n "$VOL_DISK" ]; then
+    echo " "
+    echo "$(tput setaf 10)$(tput bold)Disk detected for '$selected_volume': $VOL_DISK$(tput sgr0)"
+    printf 'Press Enter to use it, or type another disk number (ex: disk3): '
+    read -r answer
+    Bootloader="${answer:-$VOL_DISK}"
+else
+    echo " "
+    echo "$(tput setaf 10)$(tput bold)Type the disk number then press Enter.$(tput sgr0)"
+    echo "Exemple: -> $(tput setaf 10)$(tput bold)disk3$(tput sgr0)"
+    echo " "
+    while :; do
+        printf 'Disk number: '
+        read -r Bootloader
+        [ -n "$Bootloader" ] && break
+    done
+fi
+
+# normalize and validate BEFORE writing anything
+Bootloader="${Bootloader#/dev/}"
+Bootloader="${Bootloader#r}"
+case "$Bootloader" in
+    disk[0-9]|disk[0-9][0-9]) ;;
+    *) fail "'$Bootloader' is not a disk number (ex: disk3)." ;;
+esac
+[ -e "/dev/$Bootloader" ] || fail "/dev/$Bootloader does not exist — check 'diskutil list'."
+
+# cross-check: the chosen volume should live on that disk
+if [ -n "$VOL_DISK" ] && [ "$VOL_DISK" != "$Bootloader" ]; then
+    echo "WARNING: '$selected_volume' is on $VOL_DISK, but you chose $Bootloader."
+    printf 'Boot sectors will be written to %s. Continue? (y/N) ' "$Bootloader"
+    read -r answer
+    [ "$answer" = "y" ] || fail "Aborted by user."
+fi
+
 echo " "
-while [ -z "$Bootloader" ]; do
-read Bootloader
-Sleep 2
-# Setup Chameleon EFI
-PARENTDIR=$(dirname "$0")
-cd "$PARENTDIR"
-PC="./DVD-PC/Extra"
-LAPTOP="./DVD-PC/Extra"
-diskloader="./Chameleon/standard/usr/standalone/i386/boot0"
-booter="./Chameleon/standard/usr/standalone/i386/boot"
-partitionloaderfat="./Chameleon/standard/usr/standalone/i386/boot1f32"
-# Write MBR
-sudo fdisk -uy -f $diskloader /dev/r"$Bootloader" || exit 1
-sudo dd if=/dev/r"$Bootloader" count=1 bs=512 of=origMBR
+echo "Writing Chameleon boot sectors to /dev/$Bootloader ..."
+echo " "
+
+# --- 5. write boot0 to the MBR (-u keeps the partition table) -------------------------------
+sudo fdisk -uy -f "$BOOT0" "/dev/r$Bootloader" || fail "fdisk failed writing boot0."
+
+# backup/rebuild dance (kept verbatim from the original)
+sudo dd if="/dev/r${Bootloader}" count=1 bs=512 of=origMBR
 sudo cp ./origMBR ./newMBR
-sudo dd if=$diskloader of=origMBR bs=440 count=1 conv=notrunc
-sudo fdisk -f ./newMBR -u -y /dev/"$Bootloader"
-sudo dd if=/dev/r"$Bootloader"s1 count=1 bs=512 of=origbs
-sudo cp -v $partitionloaderfat newbs
+sudo dd if="$BOOT0" of=origMBR bs=440 count=1 conv=notrunc
+sudo fdisk -f ./newMBR -u -y "/dev/$Bootloader"
+
+# --- 6. boot1f32 -> partition boot sector, preserving the FAT BIOS Parameter Block -----------
+sudo dd if="/dev/r${Bootloader}s1" count=1 bs=512 of=origbs
+sudo cp -v "$BOOT1F32" newbs
 sudo dd if=origbs of=newbs skip=3 seek=3 bs=1 count=87 conv=notrunc
-sudo dd if=newbs of=/dev/"$Bootloader"s1 count=1 bs=512
-diskutil umount "$Bootloader"s1
-# Create temp Mount Point
-EFIPart="/Private/tmp/PartEFI"
-mkdir -p "$EFIPart"
-sudo umount -f "$EFIPart"
-sudo mount -t msdos /dev/"$Bootloader"s1 "$EFIPart"
-cp -v "$booter" "$EFIPart/boot"
-Sleep 2
-sudo fdisk -e /dev/r"$Bootloader" <<-MAKEACTIVE
+sudo dd if=newbs of="/dev/${Bootloader}s1" count=1 bs=512
+
+diskutil unmount "/dev/${Bootloader}s1" >/dev/null 2>&1 || true
+
+# --- 7. mount the EFI partition and install the booter ----------------------------------------
+mkdir -p "$EFIPART"
+sudo umount -f "$EFIPART" 2>/dev/null || true
+sudo mount -t msdos "/dev/${Bootloader}s1" "$EFIPART" \
+    || fail "Could not mount /dev/${Bootloader}s1 (is partition 1 a FAT/EFI partition?)"
+sudo cp -v "$BOOTER" "$EFIPART/boot"     # sudo added — the ESP is mounted by root
+sleep 2
+
+# mark partition 1 active
+sudo fdisk -e "/dev/r$Bootloader" <<-MAKEACTIVE
 p
 f 1
 w
@@ -83,52 +154,35 @@ y
 q
 MAKEACTIVE
 
+# --- 8. Chameleon Extra folder: PC or Laptop ---------------------------------------------------
+echo " "
+echo "Install Chameleon Extra Folder"
+echo "==========================================="
+echo "1) Type 1 if you use a PC"
+echo "==========================================="
+echo "2) Type 2 if you use a Laptop"
+echo "==========================================="
 echo " "
 
-Sleep 2
-# Menu options
-echo "Install Chameleon Extra Folder "
-echo "=========================================== "
-echo "1) Type 1 if you use a PC "
-echo "=========================================== "
-echo "2) Type 2 if you use a Laptop "  
-echo "=========================================== "
-
-echo "= = = = = = = = = = = = = = = = = = = = = = = = =  "
-
-options=("PC" "LAPTOP")
-
-
-# Function 1
-function option1 {
-echo "You selected PC"
-Sleep 2
-rm -rf "$EFIPart/Extra"
-Sleep 1
-cp -Rp "$PC" "$EFIPart"
-echo "Installing Extra -> /dev/"$Bootloader"s1 "
-}
-
-# Function 2
-function option2 {
-echo "You selected LAPTOP"
-Sleep 2
-rm -rf "$EFIPart/Extra"
-Sleep 1
-cp -Rp "$LAPTOP" "$EFIPart"
-echo "Installing Extra -> /dev/"$Bootloader"s1 "
-}
-
-# Display menu
 PS3="Please enter your choice: Following by Enter "
-select option in "${options[@]}"; do
-    case $option in
-        "PC")
-            option1
+select option in "PC" "LAPTOP"; do
+    case "$option" in
+        PC)
+            echo "You selected PC"
+            [ -d "$PC_DIR" ] || fail "Missing folder: $PC_DIR"
+            sleep 1
+            sudo rm -rf "$EFIPART/Extra"
+            sudo cp -Rp "$PC_DIR" "$EFIPART/"
+            echo "Installing Extra -> /dev/${Bootloader}s1"
             break
             ;;
-        "LAPTOP")
-            option2
+        LAPTOP)
+            echo "You selected LAPTOP"
+            [ -d "$LAPTOP_DIR" ] || fail "Missing folder: $LAPTOP_DIR"
+            sleep 1
+            sudo rm -rf "$EFIPART/Extra"
+            sudo cp -Rp "$LAPTOP_DIR" "$EFIPART/"
+            echo "Installing Extra -> /dev/${Bootloader}s1"
             break
             ;;
         *)
@@ -137,62 +191,70 @@ select option in "${options[@]}"; do
     esac
 done
 
-Sleep 1
-rm -rf ./origbs
-rm -rf ./newbs
-rm -rf ./origMBR
-rm -rf ./newMBR
+sleep 1
+rm -rf ./origbs ./newbs ./origMBR ./newMBR
 echo "Done!"
 
-# Define target disk
-TARGET_DISK="/dev/r$Bootloader"
-# Capture the entire output of fdisk for the target disk
-FULL_LAYOUT=$(sudo fdisk "$TARGET_DISK" 2>/dev/null)
+# --- 9. install log ------------------------------------------------------------------------------
+FULL_LAYOUT=$(sudo fdisk "/dev/r$Bootloader" 2>/dev/null)
+[ -n "$FULL_LAYOUT" ] || echo "Warning: could not read the partition table of /dev/r$Bootloader."
 
-# Verify if fdisk managed to capture anything
-if [ -z "$FULL_LAYOUT" ]; then
-  echo "Error: Could not read $TARGET_DISK. Ensure the drive is mounted."
-  exit 1
-fi
+mkdir -p "$EFIPART/Extra"
+install_log="$EFIPART/Extra/Chameleon_Install_Log.txt"
+{
+    echo ""
+    echo "Chameleon installer log - $(date)"
+    echo "Installer version: Chameleon - v2.4svn -rev 2923"
+    echo "Built: > By chris1111"
+    echo "Build Xcode Version 9.4.1 (9F2000)"
+    echo "======================================================"
+    diskutil list
+    echo "================= Chameleon EFI =================="
+    echo " "
+    echo "======================================================"
+    echo "Written boot0 to /dev/$Bootloader."
+    echo "Written boot1f32 to /dev/r${Bootloader}s1."
+    echo "Mounting /dev/${Bootloader}s1 as $EFIPART."
+    echo "Written boot to /dev/${Bootloader}s1."
+    echo "Checking $Bootloader."
+    echo "Nothing found that could cause any problems."
+    echo "======================================================"
+    echo "$FULL_LAYOUT"
+    echo "======================================================"
+    echo " "
+    echo "Setting $TARGET_VOL partition active."
+    echo "======================================================"
+    echo "======================================================"
+    echo "========== Chameleon Installation Finish =========="
+} > "$install_log"
 
-install_log="$EFIPart/Extra/Chameleon_Install_Log.txt"
-# ---------------------------------------------
-# Creating log file
-# ---------------------------------------------
-echo "" > "$install_log"
-echo "Chameleon installer log - $( date )" >> "$install_log"
-echo "Installer version: Chameleon - v2.4svn -rev 2923" >> "$install_log"
-echo "Built: > By chris1111" >> "$install_log"
-echo "Build Xcode Version 9.4.1 (9F2000)" >> "$install_log"
-echo "======================================================" >> "$install_log"
-diskutil list >> "$install_log"
-echo "================= Chameleon EFI ==================" >> "${install_log}"
-echo " " >> "${install_log}"
-echo "======================================================" >> "$install_log"
-echo "Written boot0 to /dev/"$Bootloader"." >> "$install_log"
-echo "Written boot1f32 to /dev/r"$Bootloader"s1." >> "$install_log"
-echo "Mounting /dev/"$Bootloader"s1 as /Volumes/EFI." >> "$install_log"
-echo "Written boot to /Volumes/EFI." >> "$install_log"
-echo "Checking "$Bootloader"." >> "$install_log"
-echo "Nothing found that could cause any problems." >> "$install_log"
-echo "======================================================" >> "$install_log"
-echo "$FULL_LAYOUT" >> "$install_log"
-echo "======================================================" >> "$install_log"
-echo " " >> "${install_log}"
-echo "Setting /Volumes/"$selected_volume" partition active." >> "$install_log"
-echo "======================================================" >> "${install_log}"
-echo "======================================================" >> "${install_log}"
-echo "========== Chameleon Installation Finish ==========" >> "${install_log}"
-# Install VoodooHDA
-sudo cp -Rp ./VoodooHDA/Prefpane/VoodooHDA.prefPane /Volumes/"$selected_volume"/Library/PreferencePanes
-sudo cp -Rp ./VoodooHDA/Bin/getdump /Volumes/"$selected_volume"/usr/local/bin
-sudo ./Scripts/Scripts-VoodooHDA/preinstall /"$selected_volume"
-sudo cp -Rp ./VoodooHDA/Kext/VoodooHDA.kext /Volumes/"$selected_volume"/System/Library/Extensions
-sudo cp -Rp ./VoodooHDA/Kext/AppleHDADisabler.kext /Volumes/"$selected_volume"/System/Library/Extensions
-sudo ./Scripts/Scripts-VoodooHDA/postinstall /"$selected_volume" 
-Sleep 1
-osascript -e 'tell app "loginwindow" to «event aevtrrst»'
-done
-else
-Bootloader="$2"
-fi
+# --- 10. VoodooHDA ----------------------------------------------------------------------------------
+echo "Installing VoodooHDA..."
+sudo mkdir -p "$TARGET_VOL/Library/PreferencePanes" "$TARGET_VOL/usr/local/bin" "$TARGET_VOL/System/Library/Extensions"
+sudo cp -Rp ./VoodooHDA/Prefpane/VoodooHDA.prefPane "$TARGET_VOL/Library/PreferencePanes/"
+sudo cp -Rp ./VoodooHDA/Bin/getdump "$TARGET_VOL/usr/local/bin/"
+sudo ./Scripts/Scripts-VoodooHDA/preinstall "/$selected_volume"    # argument kept exactly as the original
+sudo cp -Rp ./VoodooHDA/Kext/VoodooHDA.kext "$TARGET_VOL/System/Library/Extensions/"
+sudo cp -Rp ./VoodooHDA/Kext/AppleHDADisabler.kext "$TARGET_VOL/System/Library/Extensions/"
+sudo chown -R root:wheel "$TARGET_VOL/System/Library/Extensions/VoodooHDA.kext" \
+                          "$TARGET_VOL/System/Library/Extensions/AppleHDADisabler.kext"
+sudo ./Scripts/Scripts-VoodooHDA/postinstall "/$selected_volume"   # argument kept exactly as the original
+
+# --- 11. finish (the EFI partition stays mounted at $EFIPART) ------------------------------------
+sleep 1
+echo " "
+echo "Installation finished."
+echo "The EFI partition is still mounted at $EFIPART —"
+echo " "
+printf 'Restart now? (y/N): '
+read -r answer
+case "$answer" in
+    [yY]*)
+        osascript -e 'tell app "loginwindow" to «event aevtrrst»'
+        ;;
+    *)
+        echo "Restart skipped — the EFI partition remains mounted."
+        ;;
+esac
+
+exit 0
